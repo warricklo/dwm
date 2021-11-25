@@ -107,6 +107,7 @@ typedef struct Client Client;
 struct Client {
 	char name[256];
 	float mina, maxa;
+	float cfact;
 	int x, y, w, h;
 	int oldx, oldy, oldw, oldh;
 	int basew, baseh, incw, inch, maxw, maxh, minw, minh;
@@ -229,6 +230,7 @@ static void run(void);
 static void scan(void);
 static int sendevent(Client *c, Atom proto);
 static void sendmon(Client *c, Monitor *m);
+static void setcfact(const Arg *arg);
 static void setclientstate(Client *c, long state);
 static void setcurrentdesktop(void);
 static void setdesktopnames(void);
@@ -1184,6 +1186,7 @@ manage(Window w, XWindowAttributes *wa)
 	c->w = c->oldw = wa->width;
 	c->h = c->oldh = wa->height;
 	c->oldbw = wa->border_width;
+	c->cfact = 1.0;
 
 	updatetitle(c);
 	if (XGetTransientForHint(dpy, w, &trans) && (t = wintoclient(trans))) {
@@ -1741,6 +1744,23 @@ sendmon(Client *c, Monitor *m)
 }
 
 void
+setcfact(const Arg *arg)
+{
+	float f;
+	Client *c = selmon->sel;
+
+	if(!arg || !c || !selmon->lt[selmon->sellt]->arrange)
+		return;
+	f = arg->f + c->cfact;
+	if(arg->f == 0.0)
+		f = 1.0;
+	else if(f < 0.25 || f > 4.0)
+		return;
+	c->cfact = f;
+	arrange(selmon);
+}
+
+void
 setclientstate(Client *c, long state)
 {
 	long data[] = { state, None };
@@ -2141,9 +2161,15 @@ void
 tile(Monitor *m)
 {
 	unsigned int i, n, h, mw, my, ty;
+	float mfacts = 0, sfacts = 0;
 	Client *c;
 
-	for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
+	for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++) {
+		if (n < m->nmaster)
+			mfacts += c->cfact;
+		else
+			sfacts += c->cfact;
+	}
 	if (n == 0)
 		return;
 	if (m->pertag->drawwithgaps[m->pertag->curtag]) { /* draw with fullgaps logic */
@@ -2153,15 +2179,17 @@ tile(Monitor *m)
 			mw = m->ww - m->pertag->gappx[m->pertag->curtag];
 		for (i = 0, my = ty = m->pertag->gappx[m->pertag->curtag], c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
 			if (i < m->nmaster) {
-				h = (m->wh - my) / (MIN(n, m->nmaster) - i) - m->pertag->gappx[m->pertag->curtag];
+				h = (m->wh - my) * (c->cfact / mfacts) - m->pertag->gappx[m->pertag->curtag];
 				resize(c, m->wx + m->pertag->gappx[m->pertag->curtag], m->wy + my, mw - (2*c->bw) - m->pertag->gappx[m->pertag->curtag], h - (2*c->bw), 0);
 				if (my + HEIGHT(c) + m->pertag->gappx[m->pertag->curtag] < m->wh)
 					my += HEIGHT(c) + m->pertag->gappx[m->pertag->curtag];
+				mfacts -= c->cfact;
 			} else {
-				h = (m->wh - ty) / (n - i) - m->pertag->gappx[m->pertag->curtag];
+				h = (m->wh - ty) * (c->cfact / sfacts) - m->pertag->gappx[m->pertag->curtag];
 				resize(c, m->wx + mw + m->pertag->gappx[m->pertag->curtag], m->wy + ty, m->ww - mw - (2*c->bw) - 2*m->pertag->gappx[m->pertag->curtag], h - (2*c->bw), 0);
 				if (ty + HEIGHT(c) + m->pertag->gappx[m->pertag->curtag] < m->wh)
 					ty += HEIGHT(c) + m->pertag->gappx[m->pertag->curtag];
+				sfacts -= c->cfact;
 			}
 	} else { /* draw with singularborders logic */
 		if (n > m->nmaster)
@@ -2170,16 +2198,18 @@ tile(Monitor *m)
 			mw = m->ww;
 		for (i = my = ty = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
 			if (i < m->nmaster) {
-				h = (m->wh - my) / (MIN(n, m->nmaster) - i);
+				h = (m->wh - my) * (c->cfact / mfacts);
 				if (n == 1)
 					resize(c, m->wx - c->bw, m->wy, m->ww, m->wh, False);
 				else
 					resize(c, m->wx - c->bw, m->wy + my, mw - c->bw, h - c->bw, False);
 				my += HEIGHT(c) - c->bw;
+				mfacts -= c->cfact;
 			} else {
-				h = (m->wh - ty) / (n - i);
+				h = (m->wh - ty) * (c->cfact / sfacts);
 				resize(c, m->wx + mw - c->bw, m->wy + ty, m->ww - mw, h - c->bw, False);
 				ty += HEIGHT(c) - c->bw;
+				sfacts -= c->cfact;
 			}
 	}
 }
