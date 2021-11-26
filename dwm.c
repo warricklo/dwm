@@ -1281,7 +1281,7 @@ monocle(Monitor *m)
 		if (selmon->pertag->drawwithgaps[selmon->pertag->curtag])
 			resize(c, m->wx, m->wy, m->ww - 2 * c->bw, m->wh - 2 * c->bw, 0);
 		else
-			resize(c, m->wx - c->bw, m->wy, m->ww, m->wh, False);
+			resize(c, m->wx, m->wy, m->ww, m->wh, 0);
 }
 
 void
@@ -1595,13 +1595,11 @@ resizeclient(Client *c, int x, int y, int w, int h)
 	c->oldw = c->w; c->w = wc.width = w;
 	c->oldh = c->h; c->h = wc.height = h;
 	wc.border_width = c->bw;
-	if (!selmon->pertag->drawwithgaps[selmon->pertag->curtag] /* this is the noborderfloatingfix patch, slightly modified so that it will work if, and only if, gaps are disabled. */
-	&& (((nexttiled(c->mon->clients) == c && !nexttiled(c->next)) /* these two first lines are the only ones changed. if you are manually patching and have noborder installed already, just change these lines; or conversely, just remove this section if the noborder patch is not desired;) */
+	if (!selmon->pertag->drawwithgaps[selmon->pertag->curtag]
+	&& (((nexttiled(c->mon->clients) == c && !nexttiled(c->next))
 	|| &monocle == c->mon->lt[c->mon->sellt]->arrange))
 	&& !c->isfullscreen && !c->isfloating
 	&& NULL != c->mon->lt[c->mon->sellt]->arrange) {
-		c->w = wc.width += c->bw * 2;
-		c->h = wc.height += c->bw * 2;
 		wc.border_width = 0;
 	}
 	XConfigureWindow(dpy, c->win, CWX|CWY|CWWidth|CWHeight|CWBorderWidth, &wc);
@@ -2182,13 +2180,13 @@ tile(Monitor *m)
 		for (i = 0, my = ty = m->pertag->gappx[m->pertag->curtag], c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
 			if (i < m->nmaster) {
 				h = (m->wh - my) * (c->cfact / mfacts) - m->pertag->gappx[m->pertag->curtag];
-				resize(c, m->wx + m->pertag->gappx[m->pertag->curtag], m->wy + my, mw - (2*c->bw) - m->pertag->gappx[m->pertag->curtag], h - (2*c->bw), 0);
+				resize(c, m->wx + m->pertag->gappx[m->pertag->curtag], m->wy + my, mw - 2 * c->bw - m->pertag->gappx[m->pertag->curtag], h - 2 * c->bw, 0);
 				if (my + HEIGHT(c) + m->pertag->gappx[m->pertag->curtag] < m->wh)
 					my += HEIGHT(c) + m->pertag->gappx[m->pertag->curtag];
 				mfacts -= c->cfact;
 			} else {
 				h = (m->wh - ty) * (c->cfact / sfacts) - m->pertag->gappx[m->pertag->curtag];
-				resize(c, m->wx + mw + m->pertag->gappx[m->pertag->curtag], m->wy + ty, m->ww - mw - (2*c->bw) - 2*m->pertag->gappx[m->pertag->curtag], h - (2*c->bw), 0);
+				resize(c, m->wx + mw + m->pertag->gappx[m->pertag->curtag], m->wy + ty, m->ww - mw - 2 * c->bw - 2*m->pertag->gappx[m->pertag->curtag], h - 2 * c->bw, 0);
 				if (ty + HEIGHT(c) + m->pertag->gappx[m->pertag->curtag] < m->wh)
 					ty += HEIGHT(c) + m->pertag->gappx[m->pertag->curtag];
 				sfacts -= c->cfact;
@@ -2202,14 +2200,14 @@ tile(Monitor *m)
 			if (i < m->nmaster) {
 				h = (m->wh - my) * (c->cfact / mfacts);
 				if (n == 1)
-					resize(c, m->wx - c->bw, m->wy, m->ww, m->wh, False);
+					resize(c, m->wx, m->wy, m->ww, m->wh, 0);
 				else
-					resize(c, m->wx - c->bw, m->wy + my, mw - c->bw, h - c->bw, False);
+					resize(c, m->wx, m->wy + my, mw - c->bw, h - 2 * c->bw, 0);
 				my += HEIGHT(c) - c->bw;
 				mfacts -= c->cfact;
 			} else {
 				h = (m->wh - ty) * (c->cfact / sfacts);
-				resize(c, m->wx + mw - c->bw, m->wy + ty, m->ww - mw, h - c->bw, False);
+				resize(c, m->wx + mw, m->wy + ty, m->ww - mw - 2 * c->bw, h - 2 * c->bw, 0);
 				ty += HEIGHT(c) - c->bw;
 				sfacts -= c->cfact;
 			}
