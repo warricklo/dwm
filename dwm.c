@@ -23,7 +23,7 @@
 #include <errno.h>
 #ifdef __OpenBSD__
 #include <kvm.h>
-#endif /* __OpenBSD */
+#endif /* __OpenBSD__ */
 #include <locale.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -33,7 +33,7 @@
 #include <unistd.h>
 #ifdef __OpenBSD__
 #include <sys/sysctl.h>
-#endif /* __OpenBSD */
+#endif /* __OpenBSD__ */
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <X11/cursorfont.h>
@@ -475,7 +475,8 @@ attach(Client *c)
 }
 
 void
-attachaside(Client *c) {
+attachaside(Client *c)
+{
 	Client *at = nexttagged(c);
 	if(!at) {
 		attach(c);
@@ -493,7 +494,8 @@ attachstack(Client *c)
 }
 
 void
-autostart_exec() {
+autostart_exec()
+{
 	const char *const *p;
 	size_t i = 0;
 
@@ -1727,6 +1729,31 @@ scan(void)
 	}
 }
 
+int
+sendevent(Client *c, Atom proto)
+{
+	int n;
+	Atom *protocols;
+	int exists = 0;
+	XEvent ev;
+
+	if (XGetWMProtocols(dpy, c->win, &protocols, &n)) {
+		while (!exists && n--)
+			exists = protocols[n] == proto;
+		XFree(protocols);
+	}
+	if (exists) {
+		ev.type = ClientMessage;
+		ev.xclient.window = c->win;
+		ev.xclient.message_type = wmatom[WMProtocols];
+		ev.xclient.format = 32;
+		ev.xclient.data.l[0] = proto;
+		ev.xclient.data.l[1] = CurrentTime;
+		XSendEvent(dpy, c->win, False, NoEventMask, &ev);
+	}
+	return exists;
+}
+
 void
 sendmon(Client *c, Monitor *m)
 {
@@ -1780,37 +1807,6 @@ setdesktopnames(void){
 	XSetTextProperty(dpy, root, &text, netatom[NetDesktopNames]);
 }
 
-int
-sendevent(Client *c, Atom proto)
-{
-	int n;
-	Atom *protocols;
-	int exists = 0;
-	XEvent ev;
-
-	if (XGetWMProtocols(dpy, c->win, &protocols, &n)) {
-		while (!exists && n--)
-			exists = protocols[n] == proto;
-		XFree(protocols);
-	}
-	if (exists) {
-		ev.type = ClientMessage;
-		ev.xclient.window = c->win;
-		ev.xclient.message_type = wmatom[WMProtocols];
-		ev.xclient.format = 32;
-		ev.xclient.data.l[0] = proto;
-		ev.xclient.data.l[1] = CurrentTime;
-		XSendEvent(dpy, c->win, False, NoEventMask, &ev);
-	}
-	return exists;
-}
-
-void
-setnumdesktops(void){
-	long data[] = { TAGSLENGTH };
-	XChangeProperty(dpy, root, netatom[NetNumberOfDesktops], XA_CARDINAL, 32, PropModeReplace, (unsigned char *)data, 1);
-}
-
 void
 setfocus(Client *c)
 {
@@ -1854,22 +1850,21 @@ setfullscreen(Client *c, int fullscreen)
 void
 setgaps(const Arg *arg)
 {
-	switch(arg->i)
-	{
-		case GAP_TOGGLE:
-			selmon->pertag->drawwithgaps[selmon->pertag->curtag] = !selmon->pertag->drawwithgaps[selmon->pertag->curtag];
-			break;
-		case GAP_RESET:
-			if (selmon->pertag->curtag > 0)
-				selmon->pertag->gappx[selmon->pertag->curtag] = gappx[selmon->pertag->curtag - 1 % LENGTH(gappx)];
-			else
-				selmon->pertag->gappx[0] = gappx[0];
-			break;
-		default:
-			if (selmon->pertag->gappx[selmon->pertag->curtag] + arg->i < 0)
-				selmon->pertag->gappx[selmon->pertag->curtag] = 0;
-			else
-				selmon->pertag->gappx[selmon->pertag->curtag] += arg->i;
+	switch(arg->i) {
+	case GAP_TOGGLE:
+		selmon->pertag->drawwithgaps[selmon->pertag->curtag] = !selmon->pertag->drawwithgaps[selmon->pertag->curtag];
+		break;
+	case GAP_RESET:
+		if (selmon->pertag->curtag > 0)
+			selmon->pertag->gappx[selmon->pertag->curtag] = gappx[selmon->pertag->curtag - 1 % LENGTH(gappx)];
+		else
+			selmon->pertag->gappx[0] = gappx[0];
+		break;
+	default:
+		if (selmon->pertag->gappx[selmon->pertag->curtag] + arg->i < 0)
+			selmon->pertag->gappx[selmon->pertag->curtag] = 0;
+		else
+			selmon->pertag->gappx[selmon->pertag->curtag] += arg->i;
 	}
 	arrange(selmon);
 }
@@ -1901,6 +1896,13 @@ setmfact(const Arg *arg)
 		return;
 	selmon->mfact = selmon->pertag->mfacts[selmon->pertag->curtag] = f;
 	arrange(selmon);
+}
+
+void
+setnumdesktops(void)
+{
+	long data[] = { TAGSLENGTH };
+	XChangeProperty(dpy, root, netatom[NetNumberOfDesktops], XA_CARDINAL, 32, PropModeReplace, (unsigned char *)data, 1);
 }
 
 void
@@ -2426,6 +2428,7 @@ updateclientlist()
 				XA_WINDOW, 32, PropModeAppend,
 				(unsigned char *) &(c->win), 1);
 }
+
 void
 updatecurrentdesktop(void){
 	long rawdata[] = { selmon->tagset[selmon->seltags] };
